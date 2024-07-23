@@ -298,7 +298,35 @@ export interface NodeGroupOptions extends NodeGroupBaseOptions {
 /**
  * NodeGroupV2Options describes the configuration options accepted by a NodeGroupV2 component.
  */
-export interface NodeGroupV2Options extends NodeGroupOptions {
+export interface NodeGroupV2Options extends Omit<NodeGroupOptions, 'kubeletExtraArgs' | 'bootstrapExtraArgs' | 'labels' | 'taints'> {
+    /**
+     * Extra args to pass to the Kubelet.  Corresponds to the options passed in the `--kubeletExtraArgs` flag to
+     * `/etc/eks/bootstrap.sh`.  For example, '--port=10251 --address=0.0.0.0'. Note that the `labels` and `taints`
+     * properties will be applied to this list (using `--node-labels` and `--register-with-taints` respectively) after
+     * to the expicit `kubeletExtraArgs`.
+     */
+    kubeletExtraArgs?: pulumi.Input<string>;
+
+    /**
+     * Additional args to pass directly to `/etc/eks/bootstrap.sh`.  For details on available options, see:
+     * https://github.com/awslabs/amazon-eks-ami/blob/master/files/bootstrap.sh.  Note that the `--apiserver-endpoint`,
+     * `--b64-cluster-ca` and `--kubelet-extra-args` flags are included automatically based on other configuration
+     * parameters.
+     */
+    bootstrapExtraArgs?: pulumi.Input<string>;
+
+    /**
+     * Custom k8s node labels to be attached to each woker node.  Adds the given key/value pairs to the `--node-labels`
+     * kubelet argument.
+     */
+    labels?: pulumi.Input<{ [key: string]: string }>;
+
+    /**
+     * Custom k8s node taints to be attached to each worker node.  Adds the given taints to the `--register-with-taints`
+     * kubelet argument.
+     */
+    taints?: pulumi.Input<{ [key: string]: Taint }>;
+
     /**
      * The minimum amount of instances that should remain available during an instance refresh,
      * expressed as a percentage.
@@ -1082,33 +1110,48 @@ function createNodeGroupV2Internal(
     const awsRegion = pulumi.output(aws.getRegion({}, { parent, async: true }));
     const userDataArg = args.nodeUserData || pulumi.output("");
 
-    const kubeletExtraArgs = args.kubeletExtraArgs ? args.kubeletExtraArgs.split(" ") : [];
-    if (args.labels) {
-        const parts = [];
-        for (const key of Object.keys(args.labels)) {
-            parts.push(key + "=" + args.labels[key]);
-        }
-        if (parts.length > 0) {
-            kubeletExtraArgs.push("--node-labels=" + parts.join(","));
-        }
-    }
-    if (args.taints) {
-        const parts = [];
-        for (const key of Object.keys(args.taints)) {
-            const taint = args.taints[key];
-            parts.push(key + "=" + taint.value + ":" + taint.effect);
-        }
-        if (parts.length > 0) {
-            kubeletExtraArgs.push("--register-with-taints=" + parts.join(","));
-        }
-    }
-    let bootstrapExtraArgs = args.bootstrapExtraArgs ? " " + args.bootstrapExtraArgs : "";
-    if (kubeletExtraArgs.length === 1) {
-        // For backward compatibility with previous versions of this package, don't wrap a single argument with `''`.
-        bootstrapExtraArgs += ` --kubelet-extra-args ${kubeletExtraArgs[0]}`;
-    } else if (kubeletExtraArgs.length > 1) {
-        bootstrapExtraArgs += ` --kubelet-extra-args '${kubeletExtraArgs.join(" ")}'`;
-    }
+    const bootstrapExtraArgs = pulumi
+        .all([
+            args.kubeletExtraArgs,
+            args.labels,
+            args.taints,
+            args.bootstrapExtraArgs,
+        ])
+        .apply(([
+            kubeletArgs,
+            labels,
+            taints,
+            extraArgs,
+        ]) => {
+            const resolvedKubeletArgs = kubeletArgs ? kubeletArgs.split(" ") : [];
+            if (labels) {
+                const parts = [];
+                for (const key of Object.keys(labels)) {
+                    parts.push(key + "=" + labels[key]);
+                }
+                if (parts.length > 0) {
+                    resolvedKubeletArgs.push("--node-labels=" + parts.join(","));
+                }
+            }
+            if (taints) {
+                const parts = [];
+                for (const key of Object.keys(taints)) {
+                    const taint = taints[key];
+                    parts.push(key + "=" + taint.value + ":" + taint.effect);
+                }
+                if (parts.length > 0) {
+                    resolvedKubeletArgs.push("--register-with-taints=" + parts.join(","));
+                }
+            }
+            let bootstrapArgs = extraArgs ? " " + extraArgs : "";
+            if (resolvedKubeletArgs.length === 1) {
+                // For backward compatibility with previous versions of this package, don't wrap a single argument with `''`.
+                bootstrapArgs += ` --kubelet-extra-args ${resolvedKubeletArgs[0]}`;
+            } else if (resolvedKubeletArgs.length > 1) {
+                bootstrapArgs += ` --kubelet-extra-args '${resolvedKubeletArgs.join(" ")}'`;
+            }
+            return bootstrapArgs;
+        })
 
     const userdata = pulumi
         .all([
@@ -1119,6 +1162,7 @@ function createNodeGroupV2Internal(
             name,
             userDataArg,
             args.nodeUserDataOverride,
+            bootstrapExtraArgs
         ])
         .apply(
             ([
@@ -1129,6 +1173,7 @@ function createNodeGroupV2Internal(
                 stackName,
                 customUserData,
                 nodeUserDataOverride,
+                bootstrapArgs
             ]) => {
                 if (nodeUserDataOverride !== undefined && nodeUserDataOverride !== "") {
                     return nodeUserDataOverride;
@@ -1144,7 +1189,7 @@ chmod +x /opt/user-data
 
                 return `#!/bin/bash
 
-/etc/eks/bootstrap.sh --apiserver-endpoint "${clusterEndpoint}" --b64-cluster-ca "${clusterCa.data}" "${clusterName}"${bootstrapExtraArgs}
+/etc/eks/bootstrap.sh --apiserver-endpoint "${clusterEndpoint}" --b64-cluster-ca "${clusterCa.data}" "${clusterName}"${bootstrapArgs}
 ${customUserData}
 `;
             },
