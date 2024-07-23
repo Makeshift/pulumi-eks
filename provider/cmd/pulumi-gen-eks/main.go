@@ -1820,9 +1820,9 @@ func nodeGroupProperties(cluster, v2 bool) map[string]schema.PropertySpec {
 				Type: "object",
 				AdditionalProperties: &schema.TypeSpec{
 					Type:  "string",
-					Plain: true,
+					Plain: !v2,
 				},
-				Plain: true,
+				Plain: !v2,
 			},
 			Description: "Custom k8s node labels to be attached to each worker node. Adds the given " +
 				"key/value pairs to the `--node-labels` kubelet argument.",
@@ -1832,9 +1832,9 @@ func nodeGroupProperties(cluster, v2 bool) map[string]schema.PropertySpec {
 				Type: "object",
 				AdditionalProperties: &schema.TypeSpec{
 					Ref:   "#/types/eks:index:Taint",
-					Plain: true,
+					Plain: !v2,
 				},
-				Plain: true,
+				Plain: !v2,
 			},
 			Description: "Custom k8s node taints to be attached to each worker node. Adds the given " +
 				"taints to the `--register-with-taints` kubelet argument",
@@ -1842,7 +1842,7 @@ func nodeGroupProperties(cluster, v2 bool) map[string]schema.PropertySpec {
 		"kubeletExtraArgs": {
 			TypeSpec: schema.TypeSpec{
 				Type:  "string",
-				Plain: true,
+				Plain: !v2,
 			},
 			Description: "Extra args to pass to the Kubelet. Corresponds to the options passed in the " +
 				"`--kubeletExtraArgs` flag to `/etc/eks/bootstrap.sh`. For example, " +
@@ -1853,7 +1853,7 @@ func nodeGroupProperties(cluster, v2 bool) map[string]schema.PropertySpec {
 		"bootstrapExtraArgs": {
 			TypeSpec: schema.TypeSpec{
 				Type:  "string",
-				Plain: true,
+				Plain: !v2,
 			},
 			Description: "Additional args to pass directly to `/etc/eks/bootstrap.sh`. For details on " +
 				"available options, see: " +

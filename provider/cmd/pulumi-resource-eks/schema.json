@@ -1600,7 +1600,6 @@
                 },
                 "bootstrapExtraArgs": {
                     "type": "string",
-                    "plain": true,
                     "description": "Additional args to pass directly to `/etc/eks/bootstrap.sh`. For details on available options, see: https://github.com/awslabs/amazon-eks-ami/blob/master/files/bootstrap.sh. Note that the `--apiserver-endpoint`, `--b64-cluster-ca` and `--kubelet-extra-args` flags are included automatically based on other configuration parameters."
                 },
                 "cloudFormationTags": {
@@ -1663,16 +1662,13 @@
                 },
                 "kubeletExtraArgs": {
                     "type": "string",
-                    "plain": true,
                     "description": "Extra args to pass to the Kubelet. Corresponds to the options passed in the `--kubeletExtraArgs` flag to `/etc/eks/bootstrap.sh`. For example, '--port=10251 --address=0.0.0.0'. Note that the `labels` and `taints` properties will be applied to this list (using `--node-labels` and `--register-with-taints` respectively) after to the explicit `kubeletExtraArgs`."
                 },
                 "labels": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "string",
-                        "plain": true
+                        "type": "string"
                     },
-                    "plain": true,
                     "description": "Custom k8s node labels to be attached to each worker node. Adds the given key/value pairs to the `--node-labels` kubelet argument."
                 },
                 "launchTemplateTagSpecifications": {
@@ -1753,10 +1749,8 @@
                 "taints": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/types/eks:index:Taint",
-                        "plain": true
+                        "$ref": "#/types/eks:index:Taint"
                     },
-                    "plain": true,
                     "description": "Custom k8s node taints to be attached to each worker node. Adds the given taints to the `--register-with-taints` kubelet argument"
                 },
                 "version": {
